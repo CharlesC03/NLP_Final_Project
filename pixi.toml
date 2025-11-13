@@ -23,4 +23,8 @@ ipywidgets = ">=8.1.8,<9"
 jupyterlab_widgets = ">=3.0.16,<4"
 
 [pypi-dependencies]
-ollama = ">=0.6.0, <0.7"
+ollama = "*"
+torch = "*"
+
+[pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/cu130"]
