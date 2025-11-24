@@ -1,4 +1,4 @@
-# initial implementation of DistilBERT model
+# Trainer DistilBERT model
 
 # using the Stanford IMDB dataset.
 # Andrew L. Maas, Raymond E. Daly, Peter T. Pham, Dan Huang, Andrew Y. Ng, and Christopher Potts. (2011). Learning Word Vectors for Sentiment Analysis. The 49th Annual Meeting of the Association for Computational Linguistics (ACL 2011)
@@ -28,15 +28,38 @@ def add_label(dataset, split):
 
 #get dataset from csv file
 def load_soft_label_dataset(file_path):
-    df = pd.read_csv(csv_path)
+    
+    df = pd.read_csv(file_path)
     ds = Dataset.from_pandas(df)
     ds = ds.map(lambda x: {
         "soft_label": [
-            x["positive_prob"],
-            x["negative_prob"],
-            x.get("neutral_prob", 0.0)
-            ]
+            x["label_0"],
+            x["label_1"]]
         })
+
+    ds.rename_column("label", "labels")
+
+    #------------- START DEBUG SECTION ----------------
+    """    
+    print(f"df.columns: {df.columns}")
+    #print("First 10 rows of the DataFrame:")
+    #print(df.head(10))
+    #print("\n")
+
+    unique_df_label = df['label'].unique()
+    print("unique df labels: ")
+    print(unique_df_label)
+    print(f"\nds.column_names: {ds.column_names}")
+    unique_ds_label = ds.unique('label')
+    print("unique ds labels: ")
+    print(unique_ds_label)
+    print("\nFirst 10 entries of the Dataset:")
+    for i in range(10):
+        print(ds[i])
+        print("\n")
+    """
+    #------------- END DEBUG SECTION ------------------
+
     return ds
 
 #get IMDB dataset, create train and test datasets.
@@ -67,7 +90,8 @@ class DistillationTrainer(Trainer):
         self.temperature = temperature
 
     def compute_loss(self, model, inputs, return_outputs=False):
-        teacher_probs = inputs.pop("soft_label").to(get_device())
+       # teacher_probs = inputs.pop("soft_label").to(get_device())
+        teacher_probs = torch.Tensor(inputs.pop("soft_label")).to(model.device)
 
         outputs = model(**inputs)
         student_logits = outputs.logits
@@ -77,9 +101,9 @@ class DistillationTrainer(Trainer):
         loss = F.kl_div(student_log_probs, teacher_probs, reduction="batchmean") * (T * T)
         return (loss, outputs) if return_outputs else loss
 
-
-def train_student_from_csv(soft_dataset, test_ds, model_name="distilbert-base-uncased", temperature=2.0):
-
+#direct training version of header
+#def train_student_from_csv(soft_dataset, test_ds, model_name="distilbert-base-uncased", temperature=2.0):
+def train_student_from_csv(soft_dataset, model_name="distilbert-base-uncased", temperature=2.0):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     
     def tokenize_fn(example):
@@ -89,7 +113,7 @@ def train_student_from_csv(soft_dataset, test_ds, model_name="distilbert-base-un
 
     student_model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
-        num_labels=3   # positive, neutral, negative
+        num_labels= 2   # positive, neutral, negative
     )
     # Training arguments
     training_args = TrainingArguments(
@@ -100,15 +124,13 @@ def train_student_from_csv(soft_dataset, test_ds, model_name="distilbert-base-un
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         num_train_epochs=4,
-        #weight_decay=0.01,
         fp16=torch.cuda.is_available(),
-        #logging_steps=50,
     )
 
     # Use custom distillation trainer
     trainer = DistillationTrainer(
         model=student_model,
-        teacher_model=teacher_model,
+        #teacher_model=teacher_model,
         temperature=temperature,
         args=training_args,
         train_dataset=soft_dataset,
@@ -203,10 +225,13 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         print("GPU:", torch.cuda.get_device_name(0))
     
-    ds = load_soft_label_dataset("data/CSV FILE NAME HERE")
+    ds = load_soft_label_dataset("../data/train.csv")
 
     model, tokenizer = train_student_from_csv(ds)
 
+    model.save_pretrained("distilbert_model_from_CSV")
+    tokenizer.save_pretrained("distilbert_model_from_CSV")
+    
     start = time.time()
 
     print("Testing...")
