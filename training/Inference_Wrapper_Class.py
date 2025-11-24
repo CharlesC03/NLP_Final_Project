@@ -1,93 +1,59 @@
-import pandas as pd
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-from sklearn.metrics import accuracy_score
+from typing import List
 
 
-class SuperModelWrapper(Object):
-
-    def load_model(self):    
-        raise Exception("Don't call me, call my subclasses")
-
-    def predict(self, input_text: List[str], batch_size: int = 16):
-        raise Exception("Don't call me, call my subclasses")
-
-    def export_results(self, input_text: List[str], predictions: List[int], output_path: str):
-"""
-Args:
-    model_path (str): Path to stored model
-"""
-class ModelWrapper:
-    def __init__(self, model_path: str, device: str = None):
-        self.model_path = model_path
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = None
-        self.tokenizer = None
-
-
-    def load_model(self):
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_path)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-        self.model.to(self.device)
-        self.model.eval()
-        print(f"Model loaded on {self.device}")
-
-    def predict(self, texts, batch_size: int = 16):
+class SuperModelWrapper(object):
+    """ This class should be a super class for all of the model classes so inference is easy.
+    """
+    def load_model(self, path: str):
         """
-        Make predictions on a list of texts.
+        Load a trained model from the specified path.
+        This method must be implemented by subclasses and should not be called directly
+        on the base class.
         Args:
-            texts (list[str]): Input texts
-            batch_size (int): Batch size for inference
+            path (str): The file path to the saved model that should be loaded.
+        Raises:
+            Exception: Always raised when called on the base class, indicating that
+                       this method should be implemented by subclasses.
+        Note:
+            This is an abstract method that serves as a template for subclass
+            implementations. Each subclass should override this method with
+            its own model loading logic.
+        """
+        raise Exception("Don't call me, call my subclasses")
+    
+    def predict_batch(self, batch_input: List[str]) -> torch.Tensor:
+        """
+        Predict labels for a batch of input texts.
+        This method should be implemented by subclasses to perform batch inference
+        on the provided input strings.
+        Args:
+            batch_input (List[str]): A list of input text strings to be processed
+                and classified.
         Returns:
-            list: Predicted labels
+            torch.Tensor: A tensor containing the probability distribution of the classes for each of the inputs in the batch.
+        Raises:
+            Exception: This base class method raises an exception as it must be
+                overridden by subclasses.
         """
-        if self.model is None or self.tokenizer is None:
-            raise ValueError("Model not loaded. Call load_model() first.")
+        # Note maybe later we want to implement a method here where if not implemented it can default to the predicted class and just iterate through there.
+        raise Exception("Don't call me, call my subclasses")
 
-        all_preds = []
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i+batch_size]
-            inputs = self.tokenizer(batch_texts, padding=True, truncation=True, return_tensors="pt")
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                preds = torch.argmax(outputs.logits, dim=1)
-                all_preds.extend(preds.cpu().tolist())
-        return all_preds
-
-
-    def export_results(self, texts, predictions, output_path: str):
+    def predict(self, input_text: str) -> torch.Tensor:
         """
-        Export results to CSV.
+        Predict the output for the given input text.
+        This is an abstract method that must be implemented by subclasses.
+        Raises an exception if called directly on the base class.
         Args:
-            texts (list[str]): Input texts
-            predictions (list[int]): Model predictions
-            output_path (str): Path to save CSV
+            input_text (str): The input text to generate predictions for.
+        Returns:
+            torch.Tensor: The predicted output tensor as a probability distribution.
+        Raises:
+            Exception: Always raises an exception indicating this method should be 
+                       implemented in subclasses rather than called directly.
         """
-        df = pd.DataFrame({"text": texts, "prediction": predictions})
-        df.to_csv(output_path, index=False)
-        print(f"Results exported to {output_path}")
 
-if __name__ == "__main__":
-    wrapper = ModelWrapper(model_path="../models/distilbert_baseline_IMDB")
-    wrapper.load_model()
-    
-    #test_texts = ["I love this movie!", "This is terrible."]
-
-    test_df = pd.read_csv("../data/test.csv")
-    test_texts = test_df['text'].tolist()
-    true_labels = test_df['label'].tolist()
-    preds = wrapper.predict(test_texts)
-
-    # check accuracy
-    acc = accuracy_score(true_labels, preds)
-    print(f"Accuracy on test set: {acc:.4f}")
-
-
-    
-    
-    wrapper.export_results(test_texts, preds, "predictions.csv")
-
+        raise Exception("Don't call me, call my subclasses")
 
 
 
