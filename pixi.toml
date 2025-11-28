@@ -18,7 +18,6 @@ jupyterlab_widgets = ">=3.0,<4"
 [pypi-dependencies]
 transformers = ">=4.38"
 accelerate = ">=0.28"
-ollama = "*"
 scikit-learn = "*"
 seaborn = "*"
 matplotlib = "*"
