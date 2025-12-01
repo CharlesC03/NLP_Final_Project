@@ -2,7 +2,7 @@
 authors = ["Charles Ciampa <ceciampa@gmail.com>"]
 channels = ["conda-forge"]
 name = "NLP_Final_Project"
-platforms = ["linux-64", "osx-64"]
+platforms = ["linux-64"]
 version = "0.1.0"
 
 [tasks]
@@ -16,8 +16,13 @@ ipywidgets = ">=8.0,<9"
 jupyterlab_widgets = ">=3.0,<4"
 
 [pypi-dependencies]
+torch = ">=2.4.0"
+torchvision = ">=0.19.0"
+torchaudio = ">=2.4.0"
 transformers = ">=4.38"
 accelerate = ">=0.28"
+bitsandbytes = ">=0.43.0"
+datasets = ">=2.14"
 scikit-learn = "*"
 seaborn = "*"
 matplotlib = "*"
@@ -25,18 +30,5 @@ nltk = "*"
 pyarrow = "*"
 fsspec = "*"
 
-# Linux with CUDA support
-[target.linux-64.pypi-dependencies]
-torch = ">=2.4.0"
-torchvision = ">=0.19.0"
-torchaudio = ">=2.4.0"
-bitsandbytes = ">=0.43.0"
-
 [pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/cu124"]
-
-# macOS with CPU-only PyTorch (via conda for Intel Mac compatibility)
-[target.osx-64.dependencies]
-pytorch = ">=2.0"
-torchvision = ">=0.15"
-torchaudio = ">=2.0"
