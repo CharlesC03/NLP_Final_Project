@@ -4,6 +4,7 @@ from training.Inference_Wrapper_Class import SuperModelWrapper
 from transformers import AutoTokenizer, AutoModelForCausalLM#, BitsAndBytesConfig
 from typing import Callable, Dict
 import torch
+import gc
 
 class HFModel(SuperModelWrapper):
     def __init__(self):
