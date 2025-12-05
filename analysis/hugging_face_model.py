@@ -76,6 +76,20 @@ class HFModel(SuperModelWrapper):
         print(f"Model loaded from {path} on device {self._model.device}")
     
     def set_prompt(self, prompt_func: Callable[[str, dict], str]):
+        """ Claude Sonnet 4.5
+        Set the prompt function for generating prompts for the model.
+        Args:
+            prompt_func (Callable[[str, dict], str]): A callable that takes a string to label 
+                and label options as a dictionary, and returns a formatted prompt string.
+                The function signature should be: f(text: str, labels: dict) -> str
+        Returns:
+            None
+        Example:
+            >>> def my_prompt(text, labels):
+            ...     return f"Classify the following texts with {labels}.\nText: {text}"
+            >>> model.set_prompt(my_prompt)
+        """
+
         # Prompt function takes in as such f(string to label, label options, example dataframe) -> prompt string
         self._prompt = prompt_func
 
