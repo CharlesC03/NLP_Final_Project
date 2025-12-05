@@ -16,7 +16,6 @@ class HFModel(SuperModelWrapper):
         self._prompt = prompt
         self._labels = None
         self._reversed_labels = None
-        # self._train_df = None
 
     def set_labels(self, labels: Dict[int, str]):
         """Provided a dictionary of labels it will se the labels. The keys are the integer labels in the dataset and the values of the dictionary are the labels for the prompt into the models.
