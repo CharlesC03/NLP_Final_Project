@@ -1,4 +1,3 @@
-import http.client, urllib
 import requests
 
 from config import user_key, token_key
@@ -14,7 +13,6 @@ class Notifier:
             conn (http.client.HTTPSConnection): HTTPS connection to Pushover API server.
             enabled (bool): Flag indicating if notifications are active.
         """
-        self.r = http.client.HTTPSConnection("api.pushover.net:443")
         self.enabled = enabled
     
     def set_usage(self, enabled: bool):
@@ -46,18 +44,17 @@ class Notifier:
         """
         if not self.enabled:
             return
-        self.conn.request("POST", "/1/messages.json",
-            urllib.parse.urlencode({
+        response = requests.post("https://api.pushover.net/1/messages.json",
+            data={
                 "token": token_key,
                 "user": user_key,
                 "title": title,
                 "message": message,
                 **additional_info,
-            }), { "Content-type": "application/x-www-form-urlencoded" })
-        res = self.conn.getresponse()
-        if res.status != 200:
-            print(f"Failed to send notification: {res.status} {res.reason}")
-    
+            })
+        if response.status_code != 200:
+            print(f"Failed to send notification: {response.status_code} {response.reason}")
+
     def send_image(self, message: str, image_path: str, additional_info: Dict[str, str] = {}, title: str = "NLP Project"):
         """
         Sends a push notification with an image attachment via the Pushover API.
