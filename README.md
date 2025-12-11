@@ -18,13 +18,13 @@ The `training` folder contains the code for the student models which are trained
 
 The `models` folder contains the student models trained from the training folder. This folder is used by the code from the `training` and `analysis` folders.
 
-The `analysis` folder contains the code where we analyze the bias in the student and teacher models.
+The `analysis` folder contains the code where we analyze the bias in the student and teacher models. This also has a subfolder for the results from the IMDB testing dataset as well as a graphs folder with a variety of graphs created for the analysis.
 
 The `training`, `models`, and `analysis` folders currently contain `temp.txt` files in each since they don't contain any code so far. When other files are added to these folders make sure to delete them as they only serve the purpose of giving the repository structure.
 
 ## Installation
 
-
+There are two methods described for getting the installation prepared. One is using pixi and the other is a manual installation. This installation is only usable for the `data_prep/data_prep.ipynb` and `analysis/teacher_analysis.ipynb` code.
 
 ### Installation using Pixi
 
@@ -32,7 +32,7 @@ To install all the librarys, pixi was used for enviroment handling ([https://pix
 
 ### Manual Install
 
-If you are not able to install using pixi, the requirements are as follows.
+If you are not able to install using pixi, the required packages are as follows.
 
 - Python 3.11
 - NumPy ≥1.26
@@ -44,4 +44,6 @@ If you are not able to install using pixi, the requirements are as follows.
 - PyTorch ≥2.4.0 (CUDA 12.4)
 - Transformers ≥4.38
 - tqdm ≥4.65
+
+Feel free to install these packages using whatever enviroment manager you want to use.
 <!-- - Datasets ≥2.14 -->
