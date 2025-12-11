@@ -60,7 +60,7 @@ Open file, `analysis/analysis.ipynb`, Then run all cells. If the installation wa
 
 ## Running Code for Preparing Distillation and Performing Analysis
 
-### Training DistilBERT Model
+### Training DistilBERT Model and Generating Predictions
 Run the file training/train_distilbert_model.py. The script takes the following command line arguments:
 
 --train: accepted values are "True" or "False". If true a new model will be trained. This argument is optional, default value is True. 
