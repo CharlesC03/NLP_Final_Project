@@ -22,15 +22,19 @@ The `analysis` folder contains the code where we analyze the bias in the student
 
 The `training`, `models`, and `analysis` folders currently contain `temp.txt` files in each since they don't contain any code so far. When other files are added to these folders make sure to delete them as they only serve the purpose of giving the repository structure.
 
-## Installation
+## Running Code for Preparing Distillation and Performing Analysis
+
+This contains instructions on how to run the code for `data_prep/data_prep.ipynb` (This code gets the label probabilitys from the teacher model and saves it to the `data` folder) and `analysis/teacher_analysis.ipynb` (This code creates graphs and analyzes the results from the student models).
+
+### Installing Packages
 
 There are two methods described for getting the installation prepared. One is using pixi and the other is a manual installation. This installation is only usable for the `data_prep/data_prep.ipynb` and `analysis/teacher_analysis.ipynb` code.
 
-### Installation using Pixi
+#### Installation using Pixi
 
 To install all the librarys, pixi was used for enviroment handling ([https://pixi.sh](https://pixi.sh)). Once you have pixi installed, go to parent directory containing this project and run `pixi install`. If you are using ubuntu this will install all of the librarys automatically.
 
-### Manual Install
+#### Manual Install
 
 If you are not able to install using pixi, the required packages are as follows.
 
@@ -44,6 +48,12 @@ If you are not able to install using pixi, the required packages are as follows.
 - PyTorch ≥2.4.0 (CUDA 12.4)
 - Transformers ≥4.38
 - tqdm ≥4.65
+<!-- - Datasets ≥2.14 -->
 
 Feel free to install these packages using whatever enviroment manager you want to use.
-<!-- - Datasets ≥2.14 -->
+
+### Running Distillation
+Open file, `data_prep/data_prep.ipynb`. Then run all cells. If the installation was performed correctly with no errors, this should automatically download the training and testing data, as well as download the model. Additionally it will save the results to the `data/llama3.1` folder as `train.csv` and `test.csv`. Both of these will contain the probability the teacher model gave each of the labels.
+
+### Running Analysis
+Open file, `analysis/analysis.ipynb`, Then run all cells. If the installation was performed correctly with no errors, this should run all cells without error and additionally save all the graphs into the `graphs` subdirectory.
