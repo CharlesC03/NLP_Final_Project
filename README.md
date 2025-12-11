@@ -57,3 +57,15 @@ Open file, `data_prep/data_prep.ipynb`. Then run all cells. If the installation 
 
 ### Running Analysis
 Open file, `analysis/analysis.ipynb`, Then run all cells. If the installation was performed correctly with no errors, this should run all cells without error and additionally save all the graphs into the `graphs` subdirectory.
+
+## Running Code for Preparing Distillation and Performing Analysis
+
+### Training DistilBERT Model
+Run the file training/train_distilbert_model.py. The script takes the following command line arguments:
+
+--train: accepted values are "True" or "False". If true a new model will be trained. This argument is optional, default value is True. 
+--predict: accepted values are "True" or "False". If true the script will generate predictions. If train is true the new model will be used, otherwise mosted recently trained distilBERT model will be used. This argument is optional, default value is True.
+--model: accepted values are "baseline" or "distilled". Baseline sets model used for training and predictions as model created using IMDB dataset. Distilled uses/trains model generated with teacher soft-labels. This argument is mandatory.
+
+Predictions are saved in analysis/datasets directory under distilbert_distilled_IMDB.parquet, distilbert_distilled_EEC.parquet, distilbert_trained_IMDB.parquet, and distilbert_trained_EEC.parquet.
+Newly trained models are saved in models/distilbert_baseline_model and models/distilbert_distilled_model.
