@@ -169,7 +169,7 @@ def load_eec_dataset():
     """
     negative = ["anger", "fear","sadness"]
     positive = ["joy", "no emotion"]  
-    ds = load_dataset("csv", data_files="../data/equity_evaluation_corpus.csv")
+    ds = load_dataset("csv", data_files="../data/EEC/equity_evaluation_corpus.csv")
     ds = ds["train"]
 
     def normalize_fields_and_label(datum):
@@ -254,7 +254,7 @@ if __name__ == "__main__":
     wrapper = DistilbertWrapper()
 
     # load datasets (IMDB and EEC) 
-    train_imdb_ds, test_imdb_ds = load_imdb_dataset("../data/imdb_train.csv", "../data/imdb_test.csv")
+    train_imdb_ds, test_imdb_ds = load_imdb_dataset("../data/IMDB/imdb_train.csv", "../data/IMDB/imdb_test.csv")
     eec_train_ds, eec_test_ds = load_eec_dataset()
 
     # ==========================================================================
@@ -294,8 +294,8 @@ if __name__ == "__main__":
         if run_train:
             print("\n--- Training distilled student model from teacher soft labels ---")
             model, tokenizer = train_student_from_csv(
-                "../data/train.csv",
-                "../data/test.csv"
+                "../data/llama3.1/train.csv",
+                "../data/llama3.1/test.csv"
             )
         if run_predict:
             print("\n--- Generating predictions with baseline DistilBERT model ---")
