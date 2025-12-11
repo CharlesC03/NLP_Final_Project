@@ -1,96 +1,59 @@
 # Trainer DistilBERT model
+# Author: Daniel Alvarez
 
-# using the Stanford IMDB dataset.
+# Using the Stanford IMDB dataset.
 # Andrew L. Maas, Raymond E. Daly, Peter T. Pham, Dan Huang, Andrew Y. Ng, and Christopher Potts. (2011). Learning Word Vectors for Sentiment Analysis. The 49th Annual Meeting of the Association for Computational Linguistics (ACL 2011)
+#
+# Using the Equity Evaluation dataset
+# Svetlana Kiritchenko, Saif Mohammad (2018)
 
-from datasets import load_dataset, concatenate_datasets, Dataset
-from transformers import AutoTokenizer, DataCollatorWithPadding
-from transformers import AutoModelForSequenceClassification, TrainingArguments, Trainer
+import argparse
+from datasets import load_dataset, concatenate_datasets,  DatasetDict
 import evaluate
 import numpy as np
 import pandas as pd
-
+from tqdm import tqdm
 import torch
+import torch.nn.functional as F
+from transformers import AutoTokenizer, DataCollatorWithPadding
+from transformers import AutoModelForSequenceClassification, TrainingArguments, Trainer
+
+
+from Distilbert_Wrapper_Sub_Class import DistilbertWrapper
+
+# DALVAREZ DEBUG FLAG:  I think these imports are Not used. SHOULD be safe to remove
+from collections import Counter
 import time
+import sys
+from datasets import Dataset
 
 # helper functions
-
+# -----------------------------------------------------------------------
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
     predictions = np.argmax(logits, axis=-1)
     return accuracy.compute(predictions=predictions, references=labels)
 
-def add_label(dataset, split):
-    label = 1 if "pos" in split else 0
-    ds = dataset[split]
-    ds = ds.add_column("label", [label] * len(ds))
-    return ds
-
-#get dataset from csv file
-def load_soft_label_dataset(file_path):
-    
-    df = pd.read_csv(file_path)
-    ds = Dataset.from_pandas(df)
-    ds = ds.map(lambda x: {
-        "soft_label": [
-            x["label_0"],
-            x["label_1"]]
-        })
-
-    ds.rename_column("label", "labels")
-
-    #------------- START DEBUG SECTION ----------------
-    """    
-    print(f"df.columns: {df.columns}")
-    #print("First 10 rows of the DataFrame:")
-    #print(df.head(10))
-    #print("\n")
-
-    unique_df_label = df['label'].unique()
-    print("unique df labels: ")
-    print(unique_df_label)
-    print(f"\nds.column_names: {ds.column_names}")
-    unique_ds_label = ds.unique('label')
-    print("unique ds labels: ")
-    print(unique_ds_label)
-    print("\nFirst 10 entries of the Dataset:")
-    for i in range(10):
-        print(ds[i])
-        print("\n")
-    """
-    #------------- END DEBUG SECTION ------------------
-
-    return ds
 
 #get IMDB dataset, create train and test datasets.
-# this Was used in initial testing, should not be needed in final version
-def load_imdb_dataset():
-    dataset = load_dataset("text",
+def load_imdb_dataset(train_csv_path, test_csv_path):
+    data = load_dataset(
+        "csv",
         data_files={
-        "train_pos": "data/Imdb_v1/train/pos/*.txt",
-        "train_neg": "data/Imdb_v1/train/neg/*.txt",
-        "test_pos": "data/Imdb_v1/test/pos/*.txt",
-        "test_neg": "data/Imdb_v1/test/neg/*.txt",
-    })
-    train_dataset = concatenate_datasets([add_label(dataset, "train_pos"),add_label(dataset, "train_neg")])
-    test_dataset  = concatenate_datasets([add_label(dataset, "test_pos"),add_label(dataset, "test_neg")])
-
-    small_train_dataset = train_dataset.train_test_split(test_size=0.9, shuffle=True, seed=42)['train']
-    small_test_dataset = test_dataset.train_test_split(test_size=0.9, shuffle=True, seed=42)['test']
-
-
-    return train_dataset, test_dataset
-    #return small_train_dataset, small_test_dataset
-
-# ---------------------------------------------------------------------
+            "train": train_csv_path,
+            "test": test_csv_path
+        }
+    )
+    return data["train"], data["test"]
+# ====================================================
 
 class DistillationTrainer(Trainer):
     def __init__(self, temperature=2.0,  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.temperature = temperature
+        self.label_names = ["labels", "soft_label"]
 
-    def compute_loss(self, model, inputs, return_outputs=False):
-       # teacher_probs = inputs.pop("soft_label").to(get_device())
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         teacher_probs = torch.Tensor(inputs.pop("soft_label")).to(model.device)
 
         outputs = model(**inputs)
@@ -101,60 +64,77 @@ class DistillationTrainer(Trainer):
         loss = F.kl_div(student_log_probs, teacher_probs, reduction="batchmean") * (T * T)
         return (loss, outputs) if return_outputs else loss
 
-#direct training version of header
-#def train_student_from_csv(soft_dataset, test_ds, model_name="distilbert-base-uncased", temperature=2.0):
-def train_student_from_csv(soft_dataset, model_name="distilbert-base-uncased", temperature=2.0):
+
+# Trains a distilBERT model on teacher soft labels data.
+# inputs:
+#   train_csv_path(string): the path to a csv file containing the training dataset
+#   test_csv_path(string): the path to a csv file containing the testing dataset
+def train_student_from_csv(train_csv_path, test_csv_path=None, model_name="distilbert-base-uncased", temperature=2.0):
+    # load data
+    data = DatasetDict({
+        "train": load_dataset("csv", data_files=train_csv_path)["train"]
+    })
+    if test_csv_path is not None:
+        data["test"] = load_dataset("csv", data_files=test_csv_path)["train"]
+
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    
     def tokenize_fn(example):
         return tokenizer(example["text"], truncation=True)
-    soft_dataset = soft_dataset.map(tokenize_fn, batched=True)
-    data_collator = DataCollatorWithPadding(tokenizer)
 
+    data = data.map(tokenize_fn, batched=True)
+    # fix column names to match expected labels 
+    def create_soft_label(example):
+        example["soft_label"] = [example["label_0"], example["label_1"]]
+        return example
+    data = data.map(create_soft_label)
+    data_collator = DataCollatorWithPadding(tokenizer)
     student_model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
-        num_labels= 2   # positive, neutral, negative
+        num_labels= 2   # negative, positive
     )
     # Training arguments
     training_args = TrainingArguments(
         output_dir="distilbert-kd-softlabels",
-        evaluation_strategy="no",
+        eval_strategy="no",
         save_strategy="epoch",
         learning_rate=2e-5,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
-        num_train_epochs=4,
-        fp16=torch.cuda.is_available(),
+        num_train_epochs=7,
+        fp16=torch.cuda.is_available(), # if possible, use gpu to run faster
     )
-
     # Use custom distillation trainer
     trainer = DistillationTrainer(
         model=student_model,
-        #teacher_model=teacher_model,
         temperature=temperature,
         args=training_args,
-        train_dataset=soft_dataset,
+        train_dataset=data["train"],
         eval_dataset=None,
         tokenizer=tokenizer,
         data_collator=data_collator,
     )
     trainer.train()
+
+    # save model
+    student_model.save_pretrained("../models/distilbert_distilled_model")
+    tokenizer.save_pretrained("../models/distilbert_distilled_model")
+    
     return student_model, tokenizer
 
-def train_distilbert(train_data, test_data, model_name="distilbert-base-uncased"):
+def train_distilbert_baseline(train_data, test_data, model_name="distilbert-base-uncased"):
     global tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    def tokenize_function(example):
-        return tokenizer(example["text"], truncation=True)
-
-    small_tokenized_datasets = {
+    def tokenize_function(data):
+        tokenized = tokenizer(data["text"], truncation=True, padding=False)
+        tokenized["labels"] = data["label"]
+        return tokenized
+                                                                                               
+    tokenized_datasets = {
         "train": train_data.map(tokenize_function, batched=True),
         "test": test_data.map(tokenize_function, batched=True),
     }
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
-
     training_args = TrainingArguments(
         output_dir="distilbert-imdb-results",
         eval_strategy="epoch",
@@ -164,13 +144,13 @@ def train_distilbert(train_data, test_data, model_name="distilbert-base-uncased"
         per_device_eval_batch_size=16,
         num_train_epochs=10,
         weight_decay=0.01,
-        fp16=torch.cuda.is_available(), # I have a gpu, might as well use it if possible
+        fp16=torch.cuda.is_available(), # if possible, use gpu to run faster
     )
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=small_tokenized_datasets["train"],
-        eval_dataset=small_tokenized_datasets["test"],
+        train_dataset=tokenized_datasets["train"],
+        eval_dataset=tokenized_datasets["test"],
         tokenizer=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
@@ -180,64 +160,157 @@ def train_distilbert(train_data, test_data, model_name="distilbert-base-uncased"
     return model, tokenizer
 
 
-def predict_sentiment(model, tokenizer, text):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    model.eval()
 
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-        
-    with torch.no_grad():
-        logits = model(**inputs).logits
-    pred = logits.argmax(dim=1).item()
-    return "Positive" if pred == 1 else "Negative"
+# load the EEC dataset and clean string field values.
+def load_eec_dataset():
+    """
+    Load the Equity Evaluation Corpus from HuggingFace.
+    Returns HF Dataset dict: train / test (EEC has only one split, so we create one).
+    """
+    negative = ["anger", "fear","sadness"]
+    positive = ["joy", "no emotion"]  
+    ds = load_dataset("csv", data_files="../data/EEC/equity_evaluation_corpus.csv")
+    ds = ds["train"]
+
+    def normalize_fields_and_label(datum):
+        datum["Gender"] = datum["Gender"].strip() if datum["Gender"] and datum["Gender"].strip() != "" else "no gender"
+        datum["Race"] = datum["Race"].strip() if datum["Race"] and datum["Race"].strip() != "" else "no race"
+        datum["Emotion"] = datum["Emotion"].strip() if datum["Emotion"] and datum["Emotion"].strip() != "" else "no emotion"
+        if datum["Emotion"] in negative:
+            datum["labels"] = 0
+        elif datum["Emotion"] in positive:
+            datum["labels"] = 1
+        else:
+            print(f"WARNING: Unexpected Emotion '{datum['Emotion']}' was found. Assigned 1 as default label.")
+        return datum
+    ds = ds.map(normalize_fields_and_label)
+    split_ds = ds.train_test_split(test_size=0.2, seed=42)
+    return split_ds["train"], split_ds["test"]
+
+def generate_predictions(
+        wrapper,
+        dataset,
+        text_column="sentence",
+        output_path="default_output_path_predictions"
+    ):
+    
+    results = []
+    for example in tqdm(dataset, desc="Predicting sentiments"):
+        text = example[text_column]
+        probs = wrapper.predict(text)
+        probs_np = probs.numpy()
+
+        #testing reformatted csv output
+        entry = {}
+        for k, v in example.items():
+            if k == "labels":
+                entry["true_label"] = int(v)       # rename label → true_label
+            elif k != "labels":
+                entry[k] = v
+                
+        entry["label_0"]= float(probs_np[0])
+        entry["label_1"] = float(probs_np[1])
+        entry["pred_label"] = 0 if entry["label_0"] > entry["label_1"] else 1
+        results.append(entry)
+
+    # Save results
+    df = pd.DataFrame(results)
+    df.to_csv(output_path + ".csv", index=False)
+    df.to_parquet(output_path + ".parquet", index=False)
+    print(f"Saved sentiment predictions → {output_path}.csv / .parquet")
+    return df
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train or predict with baseline or distilled IMDB models.")
+    parser.add_argument(
+        "--model",
+        type=str,
+        choices=["baseline", "distilled"],
+        required=True,
+        help="Select which model pipeline to run: baseline or distilled."
+    )
+    parser.add_argument(
+        "--train",
+        type=str,
+        default="True",
+        help="Whether train a model. 'True' or 'False'. Default=True."
+    )
+    parser.add_argument(
+        "--predict",
+        type=str,
+        default="True",
+        help="Whether to generate predictions. 'True' or 'False'. Default=True."
+    )
+    
+    # check args
+    args = parser.parse_args()
+    run_train = args.train.lower() == "true"
+    run_predict = args.predict.lower() == "true"
 
-
-    # OLD VERSION. Trains on IMDB Dataset directly
-    """
-    start = time.time()
     global accuracy
     accuracy = evaluate.load("accuracy")
 
-    print("Loading dataset...")
-    train_ds, test_ds = load_imdb_dataset()
+    # create wrapper used for predictions
+    wrapper = DistilbertWrapper()
 
-    print("Training DistilBERT...")
-    model, tokenizer = train_distilbert(train_ds, test_ds)
+    # load datasets (IMDB and EEC) 
+    train_imdb_ds, test_imdb_ds = load_imdb_dataset("../data/IMDB/imdb_train.csv", "../data/IMDB/imdb_test.csv")
+    eec_train_ds, eec_test_ds = load_eec_dataset()
 
-    model.save_pretrained("distilbert_model_direct_IMDB")
-    tokenizer.save_pretrained("distilbert_model_direct_IMDB")
-
-    example = "The movie was absolutely wonderful, with great performances."
-    sentiment = predict_sentiment(model, tokenizer, example)
-
-    print("Sentiment:", sentiment)
-    print(f"Total time: {time.time() - start:.2f} seconds")
-    """
-
-    # NEW VERSION. Trains using CSV file of soft-probabilities
-    
-    print("Torch:", torch.__version__)
-    print("CUDA available:", torch.cuda.is_available())
-    if torch.cuda.is_available():
-        print("GPU:", torch.cuda.get_device_name(0))
-    
-    ds = load_soft_label_dataset("../data/train.csv")
-
-    model, tokenizer = train_student_from_csv(ds)
-
-    model.save_pretrained("distilbert_model_from_CSV")
-    tokenizer.save_pretrained("distilbert_model_from_CSV")
-    
-    start = time.time()
-
-    print("Testing...")
-    example = "This was terrible."
-    print(predict_sentiment(model, tokenizer, example))
-
-    elapsed = time.time() - start
-    print(f"Time to process one sentiment: {elapsed}")
-        
+    # ==========================================================================
+    #  Run on/ train baseline model
+    # ==========================================================================
+    if args.model == "baseline":
+        print("\n=== Model selected: Baseline ===\n")
+        if run_train:
+            print("\n--- Training DistilBERT model on IMDB dataset ---")
+            model, tokenizer = train_distilbert_baseline(train_imdb_ds, test_imdb_ds)
+            model.save_pretrained("../models/distilbert_baseline_model")
+            tokenizer.save_pretrained("../models/distilbert_baseline_model")
+        if run_predict:
+            print("\n--- Generating predictions with baseline DistilBERT model ---")
+            wrapper.load_model("../models/distilbert_baseline_model")
+            # generate predictions on IMDB dataset
+            generate_predictions(
+                wrapper,
+                test_imdb_ds,
+                text_column="text",
+                output_path="../analysis/datasets/baseline_IMDB_predictions"
+            )
+            # generate predictions on EEC dataset
+            generate_predictions(
+                wrapper,
+                concatenate_datasets([eec_train_ds, eec_test_ds]),
+                text_column="Sentence",
+                output_path="../analysis/datasets/baseline_EEC_predictions"
+            )
+            
+    # ==========================================================================
+    #  Run on/ train distilled model
+    # ==========================================================================
+    elif args.model == "distilled":
+        print("\n=== Model selected: Baseline ===\n")
+        # Train distilled model
+        if run_train:
+            print("\n--- Training distilled student model from teacher soft labels ---")
+            model, tokenizer = train_student_from_csv(
+                "../data/llama3.1/train.csv",
+                "../data/llama3.1/test.csv"
+            )
+        if run_predict:
+            print("\n--- Generating predictions with baseline DistilBERT model ---")
+            wrapper.load_model("../models/distilbert_distilled_model")
+            # generate predictions on IMDB dataset
+            generate_predictions(
+                wrapper,
+                test_imdb_ds,
+                text_column="text",
+                output_path="../analysis/datasets/distilled_IMDB_predictions"
+            )
+            # generate predictions on EEC dataset
+            generate_predictions(
+                wrapper,
+                concatenate_datasets([eec_train_ds, eec_test_ds]),
+                text_column="Sentence",
+                output_path="../analysis/datasets/distilled_EEC_predictions"
+            )
