@@ -69,3 +69,71 @@ Run the file training/train_distilbert_model.py. The script takes the following 
 
 Predictions are saved in analysis/datasets directory under distilbert_distilled_IMDB.parquet, distilbert_distilled_EEC.parquet, distilbert_trained_IMDB.parquet, and distilbert_trained_EEC.parquet.
 Newly trained models are saved in models/distilbert_baseline_model and models/distilbert_distilled_model.
+
+## Running code for BoW, CNN and Bias Analysis
+All necessary files to be uploaded can be found in the data folder. 
+1. Baseline Bag-of-Words (BoW)
+Notebook: Baseline BoW model and predictions on the EEC dataset
+Upload:
+train.csv (IMDB training data: text, label)
+test.csv (IMDB test data)
+0000.parquet (EEC dataset)
+Run:
+Execute all cells.
+Outputs:
+vocab_full.pkl
+imdb_bow_test_predictions.csv
+eec_predictions_bow_baseline.csv
+2. Distilled Bag-of-Words (BoW)
+Notebook: Distilled BoW model and predictions on the EEC dataset
+Upload:
+train.csv (must include label_0, label_1)
+test.csv
+0000.parquet
+vocab_full.pkl
+Run:
+Execute all cells.
+Outputs:
+imdb_bow_distilled_test_predictions.csv
+eec_predictions_bow_distilled1.csv
+3. Baseline CNN
+Notebook: Baseline CNN and prediction on the EEC dataset
+Upload:
+train.csv
+test.csv
+0000.parquet
+Run:
+Execute all cells.
+Outputs:
+vocab_CNN.pkl
+imdb_cnn_test_predictions.csv
+eec_predictions_cnn_baseline.csv
+4. Distilled CNN
+Notebook: Distilled CNN model and predictions on the EEC dataset
+Upload:
+train.csv (must include label_0, label_1)
+test.csv
+0000.parquet
+vocab_CNN.pkl
+Run:
+Execute all cells.
+Outputs:
+imdb_cnn_distilled_test_predictions.csv
+eec_predictions_cnn_distilled1.csv
+5. Bias Evaluation
+Notebook: Bias Evaluation (Kiritchenko & Mohammad, 2018)
+Upload:
+eec_predictions_bow_baseline.csv
+eec_predictions_bow_distilled1.csv
+eec_predictions_cnn_baseline.csv
+eec_predictions_cnn_distilled1.csv
+distilbert_trained_EEC_predictions.parquet
+distilbert_distilled_EEC_predictions.parquet
+teacher_model_predictions.parquet
+Run:
+Execute all cells.
+Outputs:
+Bias statistics table
+High-resolution plots:
+gender_bias.png
+race_bias.png
